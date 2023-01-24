@@ -1,26 +1,48 @@
-
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Stack;
 
 public class Main
 {
-    public static void main(String[] args)
+    public static void main(String[] args) throws Exception
     {
-        for (int iter = 0; iter < 10000; iter++)
+        double randomMin = 0.7;
         {
-            Board board = new Board();
-            board.magic = Math.random();
-            Stack<Cell> stack = new Stack<>();
-            stack.push(board.grid[(int) (Math.random() * board.size)][(int) (Math.random() * board.size)]);
-//        stack.push(board.grid[1][1]);
-            while (stack.size() < board.size * board.size)
+            Histogram hist = new Histogram();
+            System.out.printf("%3d, ", 0);
+            System.out.println(hist.getX());
+        }
+        int end;
+        int size = 6;
+        end = size * size;
+        for (int start = 1; start <= end; start++)
+        {
+            System.out.printf("%3d, ", start);
+            Histogram hist = new Histogram();
+            String filename = String.format("%03d-%dx%d-min=%.2f.txt", start, size, size, randomMin);
+            if (new File(filename).exists())
             {
-                Cell move = stack.peek().move();
-                if (move != null)
-                    stack.push(move);
-                else
+                BufferedReader reader = new BufferedReader(new FileReader(filename));
+                String output;
+                while ((output = reader.readLine()) != null)
+                    hist.add(Double.parseDouble(output));
+                reader.close();
+            }
+            BufferedWriter writer = new BufferedWriter(new FileWriter(filename, true));
+            for (int iter = 0; iter < 100000; iter++)
+            {
+                Board board = new Board(size);
+                board.magic = Math.random() * (1 - randomMin) + randomMin;
+                Stack<Cell> stack = new Stack<>();
+//            stack.push(board.grid[(int) (Math.random() * board.size)][(int) (Math.random() * board.size)]);
+                stack.push(board.grid[(start - 1) % board.size][(start - 1) / board.size]);
+                while (stack.size() < board.size * board.size)
                 {
-                    break;
+                    Cell move = stack.peek().move();
+                    if (move != null) stack.push(move);
+                    else
+                    {
+                        break;
 //                    for (int i = 0; i < board.size; i++)
 //                        for (int o = 0; o < board.size; o++)
 //                            board.grid[i][o].order = 0;
@@ -42,14 +64,76 @@ public class Main
 //                        removed.moves--;
 //                        board.grid[stack.peek().y][stack.peek().x].moves--;
 //                    }
+                    }
                 }
-            }
-            System.out.printf("%.4f, %d, %d, %d\n", board.magic, stack.size(), stack.firstElement().x, stack.firstElement().y);
+                if (stack.size() == size * size)
+                {
+                    hist.add(board.magic);
+                    writer.write(String.format("%.5f\n", board.magic));
+                }
+//            System.out.printf("%.4f, %d\n", board.magic, stack.size());
+//            System.out.printf("%.4f, %d, %d, %d\n", board.magic, stack.size(), stack.firstElement().x, stack.firstElement().y);
 //            int o = 1;
 //            for (Cell c : stack)
 //                board.grid[c.y][c.x].order = o++;
 //            System.out.println(board);
+            }
+            System.out.println(hist);
+            writer.close();
+//            System.out.printf("%f\t%d\t%f\n", sum, count, count > 0 ? sum / count : 0);
         }
+    }
+}
+
+class Histogram
+{
+    double yMin = 0.7;
+    double yMax = 1;
+    int steps = 25;
+    double[] x = new double[steps];
+    int[] y = new int[steps];
+
+    public Histogram()
+    {
+        for (int i = 0; i < steps; i++)
+            x[i] = yMin + ((double) i * (yMax - yMin)) / steps;
+    }
+
+    public void add(double value)
+    {
+        int i;
+        for (i = 0; i < steps && value > x[i]; i++) ;
+        i--;
+        if (i < 0)
+            return;
+        y[i]++;
+    }
+
+    public String getX()
+    {
+        String o = "";
+        for (double i : x)
+            o += String.format("%.5f, ", i);
+        return o;
+    }
+
+    @Override
+    public String toString()
+    {
+
+        String o = "";
+        int max = 1;
+
+        for (int i : y)
+            max = Math.max(i, max);
+
+        for (int i : y)
+            if (i == max)
+                o += String.format("\u001B[96m%7d,\u001B[0m", i);
+            else
+                o += String.format("%7d, ", i);
+
+        return o;
     }
 }
 
@@ -72,8 +156,7 @@ class Cell
 
     public int countMoves()
     {
-        if (moves != -1)
-            return moves;
+        if (moves != -1) return moves;
         moves = 0;
         for (int i = 0; i < 8; i++)
         {
@@ -81,9 +164,7 @@ class Cell
             int[] yOffsets = {-1, 1, 2, -2, 2, -2, 1, -1};
             int nextX = x + xOffsets[i];
             int nextY = y + yOffsets[i];
-            if (nextX >= 0 && nextX < board.size)
-                if (nextY >= 0 && nextY < board.size)
-                    moves++;
+            if (nextX >= 0 && nextX < board.size) if (nextY >= 0 && nextY < board.size) moves++;
         }
         return moves;
     }
@@ -102,23 +183,20 @@ class Cell
             nextX = x + xOffsets[i];
             nextY = y + yOffsets[i];
             if (nextX >= 0 && nextX < board.size)
-                if (nextY >= 0 && nextY < board.size)
-                    if (board.grid[nextY][nextX].value == 0)
-                    {
-                        move = board.grid[nextY][nextX];
-                        min = Math.min(move.moves, min);
-                        moveList.add(move);
-                    }
+                if (nextY >= 0 && nextY < board.size) if (board.grid[nextY][nextX].value == 0)
+                {
+                    move = board.grid[nextY][nextX];
+                    min = Math.min(move.moves, min);
+                    moveList.add(move);
+                }
         }
         board.grid[y][x].moves--;
-        if (moveList.size() == 0)
-            return null;
+        if (moveList.size() == 0) return null;
         if (Math.random() < board.magic)
         {
             ArrayList<Cell> removeList = new ArrayList<>();
             for (Cell m : moveList)
-                if (m.moves > min)
-                    removeList.add(m);
+                if (m.moves > min) removeList.add(m);
             for (Cell m : removeList)
                 moveList.remove(m);
         }
@@ -132,12 +210,14 @@ class Cell
 
 class Board
 {
-    public int size = 5;
-    public Cell[][] grid = new Cell[size][size];
+    public int size;
+    public Cell[][] grid;
     public double magic = 1;
 
-    public Board()
+    public Board(int size)
     {
+        grid = new Cell[size][size];
+        this.size = size;
         for (int i = 0; i < size; i++)
             for (int o = 0; o < size; o++)
                 grid[i][o] = new Cell(o, i, this);
